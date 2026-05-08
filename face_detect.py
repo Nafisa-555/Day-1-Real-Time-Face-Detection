@@ -1,53 +1,47 @@
 import cv2
-import av
+import numpy as np
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+from PIL import Image
 
-st.title("Live Face Detection")
+st.set_page_config(page_title="Live Face Detection", layout="centered")
+st.title("Face Detection App")
+st.write("Upload an image or take a photo to detect faces.")
 
 face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
-class FaceDetector(VideoProcessorBase):
-    def recv(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-        for (x, y, w, h) in faces:
-            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
+def detect_faces(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    for (x, y, w, h) in faces:
+        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 3)
+        cv2.putText(image, "Face", (x, y - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    return image, len(faces)
 
-# Using multiple STUN servers + a free open TURN server for Streamlit Cloud
-RTC_CONFIGURATION = {
-    "iceServers": [
-        {"urls": ["stun:stun.l.google.com:19302"]},
-        {"urls": ["stun:stun1.l.google.com:19302"]},
-        {"urls": ["stun:stun2.l.google.com:19302"]},
-        {
-            "urls": ["turn:openrelay.metered.ca:80"],
-            "username": "openrelayproject",
-            "credential": "openrelayproject",
-        },
-        {
-            "urls": ["turn:openrelay.metered.ca:443"],
-            "username": "openrelayproject",
-            "credential": "openrelayproject",
-        },
-        {
-            "urls": ["turn:openrelay.metered.ca:443?transport=tcp"],
-            "username": "openrelayproject",
-            "credential": "openrelayproject",
-        },
-    ]
-}
+tab1, tab2 = st.tabs(["Upload Image", "📷 Use Camera"])
 
-webrtc_streamer(
-    key="face-detection",
-    video_processor_factory=FaceDetector,
-    rtc_configuration=RTC_CONFIGURATION,
-    media_stream_constraints={
-        "video": True,
-        "audio": False,
-    },
-)
+with tab1:
+    uploaded = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+    if uploaded:
+        pil_img = Image.open(uploaded).convert("RGB")
+        img_array = np.array(pil_img)
+        bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        result, count = detect_faces(bgr)
+        result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+        st.image(result_rgb, caption=f"{count} face(s) detected", use_container_width=True)
+
+with tab2:
+    st.info("Click **Take Photo** below — face detection will run on the captured image.")
+    camera_img = st.camera_input("Take a photo")
+    if camera_img:
+        pil_img = Image.open(camera_img).convert("RGB")
+        img_array = np.array(pil_img)
+        bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        result, count = detect_faces(bgr)
+        result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+        st.image(result_rgb, caption=f"{count} face(s) detected", use_container_width=True)
+
+st.markdown("---")
+st.caption("Built with OpenCV + Streamlit · Haar Cascade face detection")
