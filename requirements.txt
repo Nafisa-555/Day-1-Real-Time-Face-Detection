@@ -1,6 +1,4 @@
 streamlit
-streamlit-webrtc
 opencv-python-headless
-av
-numpy==1.26.4
-tornado
+numpy
+Pillow
