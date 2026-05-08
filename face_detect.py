@@ -1,28 +1,28 @@
+import av
 import cv2
+import streamlit as st
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
-# Load the face detection model
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+st.title("Live Face Detection")
 
-# Start webcam
-cap = cv2.VideoCapture(0)
+face_cascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+)
 
-while True:
-    ret, frame = cap.read()
+class FaceDetection(VideoTransformerBase):
+    def transform(self, frame):
+        img = frame.to_ndarray(format="bgr24")
 
-    # Convert image to grayscale
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # Detect faces
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-    # Draw rectangle around faces
-    for (x, y, w, h) in faces:
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        for (x, y, w, h) in faces:
+            cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
 
-    cv2.imshow('Face Detection', frame)
+        return img
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cap.release()
-cv2.destroyAllWindows()
+webrtc_streamer(
+    key="face-detection",
+    video_transformer_factory=FaceDetection
+)
